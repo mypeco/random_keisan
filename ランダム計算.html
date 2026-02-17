@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ひまちゃん専用：ランダム計算フラッシュカード</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel (JSX変換用) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: manipulation; /* ダブルタップズーム防止 */
+        }
+        
+        /* アニメーション定義 */
+        @keyframes bounce-custom {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        .animate-bounce-custom {
+            animation: bounce-custom 0.4s ease-in-out;
+        }
+
+        /* テンキーのタップ時のスタイル調整 */
+        .active-scale:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // --- アイコンコンポーネント (Lucide Icons SVG) ---
+        const IconBase = ({ children, color = "currentColor", size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke={color} 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const Trophy = (props) => (
+            <IconBase {...props}>
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                <path d="M4 22h16" />
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+            </IconBase>
+        );
+
+        const RefreshCcw = (props) => (
+            <IconBase {...props}>
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+            </IconBase>
+        );
+
+        const CheckCircle2 = (props) => (
+            <IconBase {...props}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </IconBase>
+        );
+
+        const XCircle = (props) => (
+            <IconBase {...props}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="m15 9-6 6" />
+                <path d="m9 9 6 6" />
+            </IconBase>
+        );
+
+        const Delete = (props) => (
+            <IconBase {...props}>
+                <path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z" />
+                <line x1="18" y1="9" x2="12" y2="15" />
+                <line x1="12" y1="9" x2="18" y2="15" />
+            </IconBase>
+        );
+
+        const KeyboardIcon = (props) => (
+            <IconBase {...props}>
+                <rect width="20" height="16" x="2" y="4" rx="2" ry="2" />
+                <path d="M6 8h.001" />
+                <path d="M10 8h.001" />
+                <path d="M14 8h.001" />
+                <path d="M18 8h.001" />
+                <path d="M6 12h.001" />
+                <path d="M10 12h.001" />
+                <path d="M14 12h.001" />
+                <path d="M18 12h.001" />
+            </IconBase>
+        );
+
+        const Volume2 = (props) => (
+            <IconBase {...props}>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </IconBase>
+        );
+
+        const VolumeX = (props) => (
+            <IconBase {...props}>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" x2="17" y1="9" y2="15" />
+                <line x1="17" x2="23" y1="9" y2="15" />
+            </IconBase>
+        );
+
+        const History = (props) => (
+            <IconBase {...props}>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M12 7v5l4 2" />
+            </IconBase>
+        );
+
+        const Home = (props) => (
+            <IconBase {...props}>
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+            </IconBase>
+        );
+
+        const Star = (props) => (
+            <IconBase {...props} className={`${props.className || ''} ${props.fill ? 'fill-current' : ''}`}>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </IconBase>
+        );
+
+        const AlertCircle = (props) => (
+            <IconBase {...props}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" x2="12" y1="8" y2="12" />
+                <line x1="12" x2="12.01" y1="16" y2="16" />
+            </IconBase>
+        );
+        
+        const BookOpen = (props) => (
+             <IconBase {...props}>
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </IconBase>
+        );
+
+        const Gift = (props) => (
+            <IconBase {...props}>
+                <polyline points="20 12 20 22 4 22 4 12" />
+                <rect x="2" y="7" width="20" height="5" />
+                <line x1="12" x2="12" y1="22" y2="7" />
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+            </IconBase>
+        );
+
+        const Layers = (props) => (
+            <IconBase {...props}>
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+            </IconBase>
+        );
+        
+        const Zap = (props) => (
+            <IconBase {...props}>
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </IconBase>
+        );
+
+        const Crown = (props) => (
+            <IconBase {...props}>
+                <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
+            </IconBase>
+        );
+
+        // --- Web Audio API サウンドエンジン ---
+        const playSound = (type, enabled) => {
+            if (!enabled) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const now = ctx.currentTime;
+
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, now);
+                    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'wrong') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'finish') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(554, now + 0.1);
+                    osc.frequency.setValueAtTime(659, now + 0.2);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'coin') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1200, now);
+                    osc.frequency.exponentialRampToValueAtTime(2000, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                }
+            } catch (e) {
+                console.error("Audio play failed", e);
+            }
+        };
+
+        // --- メインアプリケーション ---
+        const App = () => {
+            const [appState, setAppState] = useState('home');
+            const [gameLevel, setGameLevel] = useState(1); // 1: 通常, 2: 3項計算(左から), 3: 3項計算(右優先・カッコあり)
+            const [gameMode, setGameMode] = useState(20); 
+            
+            const [currentQuestion, setCurrentQuestion] = useState(null);
+            const [userInput, setUserInput] = useState('');
+            const [status, setStatus] = useState('idle');
+            
+            const [stats, setStats] = useState({ solved: 0, total: 0, mistakes: 0 });
+            const [totalStars, setTotalStars] = useState(0);
+            const [playLogs, setPlayLogs] = useState([]);
+            const [rewardLogs, setRewardLogs] = useState([]);
+            
+            const [hasMistaken, setHasMistaken] = useState(false);
+            const [shake, setShake] = useState(false);
+            const [showKeypad, setShowKeypad] = useState(true);
+            const [soundEnabled, setSoundEnabled] = useState(true);
+            const [startTime, setStartTime] = useState(null);
+            const [endTime, setEndTime] = useState(null);
+
+            const [spendAmount, setSpendAmount] = useState('');
+            
+            const [mistakeHistory, setMistakeHistory] = useState([]);
+            const [currentSessionMistakes, setCurrentSessionMistakes] = useState([]);
+
+            const containerRef = useRef(null);
+
+            useEffect(() => {
+                const savedMistakes = localStorage.getItem('hima_math_mistakes');
+                if (savedMistakes) setMistakeHistory(JSON.parse(savedMistakes));
+                
+                const savedStars = localStorage.getItem('hima_math_total_stars');
+                if (savedStars) setTotalStars(parseInt(savedStars, 10));
+
+                const savedLogs = localStorage.getItem('hima_math_play_logs');
+                if (savedLogs) setPlayLogs(JSON.parse(savedLogs));
+
+                const savedRewards = localStorage.getItem('hima_math_reward_logs');
+                if (savedRewards) setRewardLogs(JSON.parse(savedRewards));
+            }, []);
+
+            const addTotalStar = () => {
+                setTotalStars(prev => {
+                    // スター獲得数ロジック
+                    let bonus = 1;
+                    if (gameMode !== 'review') {
+                        if (gameLevel === 2) bonus = 2;
+                        if (gameLevel === 3) bonus = 3; // レベル3は3倍
+                    }
+                    
+                    const next = prev + bonus;
+                    localStorage.setItem('hima_math_total_stars', next.toString());
+                    return next;
+                });
+            };
+
+            const spendStars = () => {
+                const amount = parseInt(spendAmount, 10);
+                if (!amount || amount <= 0) return;
+                if (amount > totalStars) {
+                    alert('スターがたりないよ！もっとべんきょうしてためよう！');
+                    return;
+                }
+
+                if (!confirm(`${amount}こ スターをつかいますか？`)) return;
+
+                const newTotal = totalStars - amount;
+                setTotalStars(newTotal);
+                localStorage.setItem('hima_math_total_stars', newTotal.toString());
+
+                const newLog = {
+                    date: new Date().toISOString(),
+                    amount: amount,
+                    id: Date.now()
+                };
+                const nextLogs = [newLog, ...rewardLogs].slice(0, 50);
+                setRewardLogs(nextLogs);
+                localStorage.setItem('hima_math_reward_logs', JSON.stringify(nextLogs));
+                
+                setSpendAmount('');
+                playSound('coin', soundEnabled);
+            };
+
+            const savePlayLog = (logData) => {
+                const newLog = {
+                    ...logData,
+                    date: new Date().toISOString(),
+                    id: Date.now()
+                };
+                setPlayLogs(prev => {
+                    const nextLogs = [newLog, ...prev].slice(0, 50);
+                    localStorage.setItem('hima_math_play_logs', JSON.stringify(nextLogs));
+                    return nextLogs;
+                });
+            };
+
+            const saveMistake = (question) => {
+                const newHistory = [...mistakeHistory];
+                const qStr = JSON.stringify(question);
+                if (!newHistory.some(h => JSON.stringify(h) === qStr)) {
+                    newHistory.push({ ...question, date: new Date().toISOString() });
+                    setMistakeHistory(newHistory);
+                    localStorage.setItem('hima_math_mistakes', JSON.stringify(newHistory));
+                }
+                setCurrentSessionMistakes(prev => {
+                    const isAlreadyInSession = prev.some(p => JSON.stringify(p) === qStr);
+                    if (!isAlreadyInSession) return [...prev, question];
+                    return prev;
+                });
+            };
+
+            const removeMistake = (question) => {
+                if (gameMode !== 'review') return;
+                const newHistory = mistakeHistory.filter(h => 
+                    JSON.stringify(h) !== JSON.stringify(question)
+                );
+                setMistakeHistory(newHistory);
+                localStorage.setItem('hima_math_mistakes', JSON.stringify(newHistory));
+            };
+
+            // --- 問題生成ロジック ---
+            const generateQuestion = useCallback(() => {
+                if (gameMode === 'review') {
+                    if (mistakeHistory.length === 0) return null;
+                    const idx = Math.floor(Math.random() * mistakeHistory.length);
+                    return mistakeHistory[idx];
+                }
+
+                const operators = ['+', '-', '×', '÷'];
+                
+                // --- レベル3（3項計算・右優先・カッコあり） ---
+                if (gameLevel === 3) {
+                    // パターン:
+                    // 1: A op1 B op2 C (ただし右側が ×か÷ で、左側が +か- の場合、右から計算)
+                    // 2: A op1 (B op2 C)
+                    // 3: (A op1 B) op2 C
+                    
+                    const pattern = Math.floor(Math.random() * 3); // 0, 1, 2
+                    let num1, num2, num3, op1, op2, answer;
+                    
+                    if (pattern === 0) {
+                        // 優先順位パターン (A + B × C など)
+                        // op2を優先にするため、op2を × or ÷ に、op1を + or - に固定
+                        op2 = ['×', '÷'][Math.floor(Math.random() * 2)];
+                        op1 = ['+', '-'][Math.floor(Math.random() * 2)];
+                        
+                        // 先に B op2 C を計算 (val2)
+                        let val2;
+                        if (op2 === '×') {
+                            num2 = Math.floor(Math.random() * 9) + 2;
+                            num3 = Math.floor(Math.random() * 9) + 2;
+                            val2 = num2 * num3;
+                        } else {
+                            // 割り切れるように
+                            num3 = Math.floor(Math.random() * 9) + 2;
+                            const ans = Math.floor(Math.random() * 9) + 2;
+                            val2 = ans;
+                            num2 = ans * num3;
+                        }
+                        
+                        // 次に A op1 val2 を計算
+                        if (op1 === '+') {
+                            num1 = Math.floor(Math.random() * 20) + 1;
+                            answer = num1 + val2;
+                        } else {
+                            num1 = Math.floor(Math.random() * 20) + val2 + 5; // 負にならないよう少し大きく
+                            answer = num1 - val2;
+                        }
+                        
+                        return { level: 3, pattern: 'priority', num1, op1, num2, op2, num3, answer };
+                        
+                    } else if (pattern === 1) {
+                        // 右カッコパターン A op1 (B op2 C)
+                        // カッコ内を先に計算
+                        op2 = operators[Math.floor(Math.random() * operators.length)];
+                        
+                        let val2; // カッコ内の値
+                        if (op2 === '+') {
+                            num2 = Math.floor(Math.random() * 10) + 1;
+                            num3 = Math.floor(Math.random() * 10) + 1;
+                            val2 = num2 + num3;
+                        } else if (op2 === '-') {
+                            num2 = Math.floor(Math.random() * 15) + 5;
+                            num3 = Math.floor(Math.random() * (num2 - 1)) + 1;
+                            val2 = num2 - num3;
+                        } else if (op2 === '×') {
+                            num2 = Math.floor(Math.random() * 5) + 2;
+                            num3 = Math.floor(Math.random() * 5) + 2;
+                            val2 = num2 * num3;
+                        } else { // ÷
+                            const ans = Math.floor(Math.random() * 5) + 2;
+                            num3 = Math.floor(Math.random() * 5) + 2;
+                            num2 = ans * num3;
+                            val2 = ans;
+                        }
+                        
+                        op1 = operators[Math.floor(Math.random() * operators.length)];
+                        
+                        if (op1 === '+') {
+                            num1 = Math.floor(Math.random() * 20) + 1;
+                            answer = num1 + val2;
+                        } else if (op1 === '-') {
+                            num1 = Math.floor(Math.random() * 20) + val2 + 1;
+                            answer = num1 - val2;
+                        } else if (op1 === '×') {
+                            // 大きくなりすぎないように
+                            num1 = Math.floor(Math.random() * 5) + 2;
+                            if (val2 > 10) num1 = 2; 
+                            answer = num1 * val2;
+                        } else { // ÷
+                            // num1 が val2 で割り切れるように
+                            const ans = Math.floor(Math.random() * 5) + 2;
+                            num1 = ans * val2;
+                            answer = ans;
+                        }
+                        
+                        return { level: 3, pattern: 'parens_right', num1, op1, num2, op2, num3, answer };
+
+                    } else {
+                        // 左カッコパターン (A op1 B) op2 C
+                        // カッコ内を先に計算 (val1)
+                        op1 = operators[Math.floor(Math.random() * operators.length)];
+                        
+                        let val1;
+                        if (op1 === '+') {
+                            num1 = Math.floor(Math.random() * 10) + 1;
+                            num2 = Math.floor(Math.random() * 10) + 1;
+                            val1 = num1 + num2;
+                        } else if (op1 === '-') {
+                            num1 = Math.floor(Math.random() * 15) + 5;
+                            num2 = Math.floor(Math.random() * (num1 - 1)) + 1;
+                            val1 = num1 - num2;
+                        } else if (op1 === '×') {
+                            num1 = Math.floor(Math.random() * 5) + 2;
+                            num2 = Math.floor(Math.random() * 5) + 2;
+                            val1 = num1 * num2;
+                        } else { // ÷
+                            const ans = Math.floor(Math.random() * 5) + 2;
+                            num2 = Math.floor(Math.random() * 5) + 2;
+                            num1 = ans * num2;
+                            val1 = ans;
+                        }
+                        
+                        op2 = operators[Math.floor(Math.random() * operators.length)];
+                        
+                        if (op2 === '+') {
+                            num3 = Math.floor(Math.random() * 20) + 1;
+                            answer = val1 + num3;
+                        } else if (op2 === '-') {
+                            num3 = Math.floor(Math.random() * (val1 - 1)) + 1;
+                            answer = val1 - num3;
+                        } else if (op2 === '×') {
+                            num3 = Math.floor(Math.random() * 5) + 2;
+                            if (val1 > 10) num3 = 2;
+                            answer = val1 * num3;
+                        } else { // ÷
+                            // val1 が num3 で割り切れるように
+                            // val1の約数から探す
+                            const divisors = [];
+                            for(let i=2; i<val1; i++) {
+                                if (val1 % i === 0) divisors.push(i);
+                            }
+                            if (divisors.length > 0) {
+                                num3 = divisors[Math.floor(Math.random() * divisors.length)];
+                                answer = val1 / num3;
+                            } else {
+                                // 割り切れない場合は + に変更
+                                op2 = '+';
+                                num3 = Math.floor(Math.random() * 10) + 1;
+                                answer = val1 + num3;
+                            }
+                        }
+                        
+                         return { level: 3, pattern: 'parens_left', num1, op1, num2, op2, num3, answer };
+                    }
+                }
+
+                // --- レベル2（3項計算・左から順） ---
+                if (gameLevel === 2) {
+                    let num1, num2, num3, op1, op2, answer;
+                    op1 = operators[Math.floor(Math.random() * operators.length)];
+                    
+                    let tempResult;
+                    if (op1 === '+') {
+                        num1 = Math.floor(Math.random() * 20) + 1;
+                        num2 = Math.floor(Math.random() * 20) + 1;
+                        tempResult = num1 + num2;
+                    } else if (op1 === '-') {
+                        num1 = Math.floor(Math.random() * 30) + 10;
+                        num2 = Math.floor(Math.random() * (num1 - 5)) + 2;
+                        tempResult = num1 - num2;
+                    } else if (op1 === '×') {
+                        num1 = Math.floor(Math.random() * 9) + 2;
+                        num2 = Math.floor(Math.random() * 9) + 2;
+                        tempResult = num1 * num2;
+                    } else { // ÷
+                        const divAns = Math.floor(Math.random() * 9) + 2;
+                        num2 = Math.floor(Math.random() * 9) + 2;
+                        num1 = divAns * num2;
+                        tempResult = divAns;
+                    }
+
+                    let availableOp2 = [];
+                    if (op1 === '+' || op1 === '-') {
+                        availableOp2 = ['+', '-']; 
+                    } else {
+                        availableOp2 = ['+', '-', '×', '÷']; 
+                    }
+                    op2 = availableOp2[Math.floor(Math.random() * availableOp2.length)];
+
+                    if (op2 === '+') {
+                        num3 = Math.floor(Math.random() * 20) + 1;
+                        answer = tempResult + num3;
+                    } else if (op2 === '-') {
+                        num3 = Math.floor(Math.random() * (tempResult - 1)) + 1; 
+                        answer = tempResult - num3;
+                    } else if (op2 === '×') {
+                        num3 = Math.floor(Math.random() * 5) + 2;
+                        if (tempResult > 20) num3 = 2; 
+                        answer = tempResult * num3;
+                    } else { // ÷
+                        const divisors = [];
+                        for(let i=2; i<tempResult; i++) {
+                            if (tempResult % i === 0) divisors.push(i);
+                        }
+                        if (divisors.length > 0) {
+                            num3 = divisors[Math.floor(Math.random() * divisors.length)];
+                            answer = tempResult / num3;
+                        } else {
+                            op2 = '+';
+                            num3 = Math.floor(Math.random() * 10) + 1;
+                            answer = tempResult + num3;
+                        }
+                    }
+
+                    return { level: 2, num1, op1, num2, op2, num3, answer };
+                }
+
+                // --- レベル1（既存） ---
+                const op = operators[Math.floor(Math.random() * operators.length)];
+                let num1, num2, answer;
+
+                switch (op) {
+                    case '+':
+                        num1 = Math.floor(Math.random() * 40) + 10;
+                        num2 = Math.floor(Math.random() * 40) + 10;
+                        answer = num1 + num2;
+                        break;
+                    case '-':
+                        num1 = Math.floor(Math.random() * 50) + 20;
+                        num2 = Math.floor(Math.random() * (num1 - 5)) + 5;
+                        answer = num1 - num2;
+                        break;
+                    case '×':
+                        num1 = Math.floor(Math.random() * 9) + 2;
+                        num2 = Math.floor(Math.random() * 12) + 2;
+                        answer = num1 * num2;
+                        break;
+                    case '÷':
+                        answer = Math.floor(Math.random() * 9) + 2;
+                        num2 = Math.floor(Math.random() * 9) + 2;
+                        num1 = answer * num2;
+                        break;
+                }
+                return { level: 1, num1, num2, op, answer };
+
+            }, [gameMode, mistakeHistory, gameLevel]);
+
+            const startGame = (count) => {
+                setGameMode(count);
+                const total = count === 'review' ? mistakeHistory.length : count;
+                setStats({ solved: 0, total, mistakes: 0 });
+                setCurrentSessionMistakes([]);
+                setStartTime(Date.now());
+                setAppState('playing');
+            };
+
+            useEffect(() => {
+                if (appState === 'playing' && !currentQuestion) {
+                    const q = generateQuestion();
+                    if (q) {
+                        setCurrentQuestion(q);
+                        setHasMistaken(false); 
+                    }
+                    else if (gameMode === 'review') {
+                        setAppState('home');
+                    }
+                }
+            }, [appState, generateQuestion, currentQuestion, gameMode]);
+
+            const nextQuestion = () => {
+                const targetCount = gameMode === 'review' ? Infinity : gameMode; 
+                
+                if (gameMode === 'review' && mistakeHistory.length === 0) {
+                    finishGame();
+                    return;
+                }
+                
+                if (gameMode !== 'review' && stats.solved + 1 >= targetCount) {
+                    finishGame();
+                    return;
+                }
+
+                const nextQ = generateQuestion();
+                setCurrentQuestion(nextQ);
+                setUserInput('');
+                setStatus('idle');
+                setShake(false);
+                setHasMistaken(false); 
+            };
+
+            const finishGame = () => {
+                const end = Date.now();
+                setEndTime(end);
+                playSound('finish', soundEnabled);
+                
+                const finalSolved = stats.solved + 1;
+                const accuracy = gameMode === 'review' 
+                    ? 100 
+                    : Math.round(((finalSolved - stats.mistakes) / finalSolved) * 100) || 0;
+                
+                const timeSpent = end - startTime;
+
+                savePlayLog({
+                    mode: gameMode,
+                    level: gameLevel, 
+                    accuracy: accuracy,
+                    timeSpent: timeSpent,
+                    count: finalSolved
+                });
+
+                setAppState('result');
+            };
+
+            const handleInput = (val) => {
+                if (status === 'correct') return;
+
+                let nextInput;
+                if (val === 'DEL') {
+                    nextInput = userInput.slice(0, -1);
+                    setStatus('idle');
+                    setShake(false);
+                } else {
+                    nextInput = userInput + val;
+                }
+                setUserInput(nextInput);
+
+                if (!currentQuestion || nextInput === '') return;
+
+                const answerStr = currentQuestion.answer.toString();
+                const inputNum = parseInt(nextInput);
+
+                if (inputNum === currentQuestion.answer) {
+                    setStatus('correct');
+                    playSound('correct', soundEnabled);
+                    setStats(prev => ({ ...prev, solved: prev.solved + 1 }));
+                    
+                    addTotalStar();
+
+                    if (gameMode === 'review') removeMistake(currentQuestion);
+
+                    setTimeout(nextQuestion, 200);
+                } 
+                else if (nextInput.length >= answerStr.length) {
+                    setStatus('wrong');
+                    playSound('wrong', soundEnabled);
+                    setShake(true);
+                    
+                    if (gameMode !== 'review' && !hasMistaken) {
+                        saveMistake(currentQuestion);
+                        setStats(prev => ({ ...prev, mistakes: prev.mistakes + 1 }));
+                        setHasMistaken(true); 
+                    }
+
+                    setTimeout(() => {
+                        setShake(false);
+                        setUserInput('');
+                        setStatus('idle');
+                    }, 400);
+                }
+            };
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (appState !== 'playing') return;
+                    if (/[0-9]/.test(e.key)) {
+                        handleInput(e.key);
+                    } else if (e.key === 'Backspace') {
+                        handleInput('DEL');
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [appState, status, userInput, currentQuestion, soundEnabled, hasMistaken]);
+
+            const getOpColor = (op) => {
+                switch (op) {
+                    case '+': return 'text-pink-500';
+                    case '-': return 'text-blue-500';
+                    case '×': return 'text-orange-500';
+                    case '÷': return 'text-purple-500';
+                    default: return 'text-gray-500';
+                }
+            };
+
+            const formatTime = (ms) => {
+                const seconds = Math.floor(ms / 1000);
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m}分${s}秒`;
+            };
+            
+            const formatDate = (isoString) => {
+                const date = new Date(isoString);
+                return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+            };
+
+            const getEvaluation = (accuracy) => {
+                if (accuracy === 100) return { icon: '💮', label: 'かんぺき！' };
+                if (accuracy >= 90) return { icon: '🎉', label: 'すごい！' };
+                return { icon: '👍', label: 'ナイス！' };
+            };
+
+            // --- レンダリング分岐 ---
+
+            if (appState === 'history') {
+                return (
+                    <div className="min-h-screen bg-pink-50 flex flex-col items-center font-sans p-4 overflow-y-auto">
+                        <div className="bg-white p-6 rounded-[2rem] shadow-xl max-w-md w-full border-4 border-pink-100 my-4 flex-1 flex flex-col">
+                            <h2 className="text-2xl font-black text-pink-500 mb-6 flex items-center justify-center gap-2">
+                                <BookOpen size={28} />
+                                これまでのきろく
+                            </h2>
+                            <div className="bg-yellow-50 rounded-2xl p-4 mb-6 border-2 border-yellow-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="font-bold text-yellow-700">もってるスター</span>
+                                    <div className="flex items-center gap-2">
+                                        <Star fill={true} className="text-yellow-400 w-8 h-8" />
+                                        <span className="text-4xl font-black text-yellow-500 font-mono">{totalStars}</span>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl p-3 shadow-sm">
+                                    <div className="text-xs font-bold text-gray-500 mb-2">ごほうびと こうかん（おやごさん用）</div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="number" 
+                                            placeholder="いくつ?" 
+                                            className="w-24 bg-gray-100 rounded-lg p-2 text-center font-bold outline-none focus:ring-2 focus:ring-yellow-300"
+                                            value={spendAmount}
+                                            onChange={(e) => setSpendAmount(e.target.value)}
+                                        />
+                                        <button 
+                                            onClick={spendStars}
+                                            disabled={!spendAmount}
+                                            className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-white font-bold rounded-lg p-2 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                                        >
+                                            <Gift size={18} />
+                                            つかう
+                                        </button>
+                                    </div>
+                                </div>
+                                {rewardLogs.length > 0 && (
+                                    <div className="mt-4">
+                                        <div className="text-xs font-bold text-yellow-700 mb-2">つかったきろく</div>
+                                        <div className="space-y-2">
+                                            {rewardLogs.slice(0, 3).map(log => (
+                                                <div key={log.id} className="flex justify-between items-center text-sm bg-white/50 p-2 rounded-lg">
+                                                    <span className="text-gray-500">{formatDate(log.date)}</span>
+                                                    <span className="font-bold text-yellow-600 flex items-center gap-1">
+                                                        -{log.amount} <Star size={12} fill={true} />
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-lg font-bold text-pink-500 mb-2 flex items-center gap-2">
+                                <CheckCircle2 size={20} />
+                                べんきょうのきろく
+                            </div>
+                            {playLogs.length === 0 ? (
+                                <div className="text-gray-400 text-center py-10">まだきろくがないよ。<br/>もんだいをといてみよう！</div>
+                            ) : (
+                                <div className="space-y-3 overflow-y-auto flex-1 max-h-[40vh]">
+                                    {playLogs.map((log) => (
+                                        <div key={log.id} className="bg-gray-50 rounded-xl p-3 flex justify-between items-center border border-gray-100">
+                                            <div>
+                                                <div className="text-xs text-gray-400 font-bold mb-1">{formatDate(log.date)}</div>
+                                                <div className="font-black text-gray-700 flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-xs text-white ${log.level === 3 ? 'bg-yellow-500' : log.level === 2 ? 'bg-purple-400' : 'bg-pink-400'}`}>
+                                                        Lv.{log.level || 1}
+                                                    </span>
+                                                    {log.mode === 'review' ? 'にがてとっくん' : `${log.count}問`}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-xl font-black text-pink-500">{log.accuracy}%</div>
+                                                <div className="text-xs text-gray-400">{formatTime(log.timeSpent)}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <button onClick={() => setAppState('home')} className="mt-6 bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 rounded-xl transition-colors w-full">もどる</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ホーム画面
+            if (appState === 'home') {
+                return (
+                    <div className="min-h-screen bg-pink-50 flex flex-col items-center justify-center font-sans p-4 relative">
+                        <div className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 px-4 rounded-full border-2 border-yellow-200 shadow-sm flex items-center gap-2">
+                             <Star fill={true} className="text-yellow-400 w-6 h-6" />
+                             <span className="text-2xl font-black text-yellow-500 font-mono">{totalStars}</span>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[3rem] shadow-xl max-w-md w-full text-center border-4 border-pink-100 mt-12">
+                            <h1 className="text-3xl font-black text-pink-500 mb-6 flex items-center justify-center gap-2">
+                                <Star fill={true} className="text-yellow-400" />
+                                ひまちゃん計算
+                                <Star fill={true} className="text-yellow-400" />
+                            </h1>
+                            
+                            {/* レベル選択タブ */}
+                            <div className="bg-gray-100 p-2 rounded-2xl mb-6 grid grid-cols-3 gap-2">
+                                <button 
+                                    onClick={() => setGameLevel(1)}
+                                    className={`py-2 rounded-xl font-black transition-all text-sm flex flex-col items-center gap-1 ${gameLevel === 1 ? 'bg-white text-pink-500 shadow-md ring-2 ring-pink-200' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <span>レベル１</span>
+                                    <span className="text-[10px] font-bold text-gray-400">いつもの</span>
+                                </button>
+                                <button 
+                                    onClick={() => setGameLevel(2)}
+                                    className={`py-2 rounded-xl font-black transition-all text-sm flex flex-col items-center gap-1 ${gameLevel === 2 ? 'bg-purple-100 text-purple-600 shadow-md ring-2 ring-purple-300' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        <span>レベル２</span>
+                                        <Zap size={14} className="fill-purple-500 text-purple-500" />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-purple-400 flex items-center gap-1">
+                                        <Star size={8} fill={true} />
+                                        ２ばい！
+                                    </span>
+                                </button>
+                                <button 
+                                    onClick={() => setGameLevel(3)}
+                                    className={`py-2 rounded-xl font-black transition-all text-sm flex flex-col items-center gap-1 ${gameLevel === 3 ? 'bg-yellow-100 text-yellow-600 shadow-md ring-2 ring-yellow-300' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        <span>レベル３</span>
+                                        <Crown size={14} className="fill-yellow-500 text-yellow-500" />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-yellow-500 flex items-center gap-1">
+                                        <Star size={8} fill={true} />
+                                        ３ばい！
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-4 mb-8">
+                                <p className="text-gray-500 font-bold mb-2">なんもんやる？</p>
+                                <div className="grid grid-cols-3 gap-4">
+                                    {[20, 50, 100].map(count => (
+                                        <button
+                                            key={count}
+                                            onClick={() => startGame(count)}
+                                            className={`${
+                                                gameLevel === 3 ? 'bg-yellow-100 text-yellow-600 border-yellow-300 hover:bg-yellow-200' :
+                                                gameLevel === 2 ? 'bg-purple-100 text-purple-600 border-purple-300 hover:bg-purple-200' : 
+                                                'bg-pink-100 text-pink-600 border-pink-300 hover:bg-pink-200'
+                                            } font-black py-4 rounded-2xl text-xl transition-transform active:scale-95 border-b-4`}
+                                        >
+                                            {count}問
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <button
+                                    onClick={() => startGame('review')}
+                                    disabled={mistakeHistory.length === 0}
+                                    className={`w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 border-b-4 transition-all active:scale-95 mt-4
+                                        ${mistakeHistory.length > 0 
+                                            ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-300' 
+                                            : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'}`}
+                                >
+                                    <History size={24} />
+                                    にがてなやつ ({mistakeHistory.length}問)
+                                </button>
+
+                                <button onClick={() => setAppState('history')} className="w-full py-3 rounded-2xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 border-b-4 border-gray-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                                    <BookOpen size={20} />
+                                    きろくをみる
+                                </button>
+                            </div>
+                            <button onClick={() => setSoundEnabled(!soundEnabled)} className="flex items-center justify-center gap-2 text-gray-400 hover:text-pink-500 transition-colors mx-auto font-bold">
+                                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                                音: {soundEnabled ? 'ON' : 'OFF'}
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (appState === 'result') {
+                const finalSolved = stats.solved + 1;
+                const accuracy = gameMode === 'review' ? 100 : Math.round(((finalSolved - stats.mistakes) / finalSolved) * 100) || 0;
+                const timeSpent = endTime - startTime;
+                const evaluation = getEvaluation(accuracy);
+
+                return (
+                    <div className="min-h-screen bg-pink-50 flex flex-col items-center justify-center font-sans p-4 overflow-y-auto">
+                        <div className="bg-white p-6 md:p-10 rounded-[2rem] shadow-xl max-w-2xl w-full border-4 border-pink-100 my-4">
+                            <div className="text-center mb-8">
+                                <div className="text-8xl mb-4 animate-bounce-custom">{evaluation.icon}</div>
+                                <h2 className="text-4xl font-black text-pink-500">{evaluation.label}</h2>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="bg-blue-50 p-4 rounded-2xl text-center">
+                                    <p className="text-blue-400 font-bold text-sm">タイム</p>
+                                    <p className="text-3xl font-black text-blue-600">{formatTime(timeSpent)}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-2xl text-center">
+                                    <p className="text-green-500 font-bold text-sm">せいかいりつ</p>
+                                    <p className="text-3xl font-black text-green-600">{accuracy}%</p>
+                                </div>
+                            </div>
+                            {currentSessionMistakes.length > 0 && (
+                                <div className="mb-8">
+                                    <h3 className="text-gray-500 font-bold mb-2 flex items-center gap-2">
+                                        <AlertCircle size={20} />
+                                        まちがえたもんだい
+                                    </h3>
+                                    <div className="bg-gray-50 rounded-2xl p-4 max-h-48 overflow-y-auto">
+                                        {currentSessionMistakes.map((q, i) => (
+                                            <div key={i} className="flex items-center justify-between py-2 border-b last:border-0 border-gray-200 text-lg font-bold text-gray-600">
+                                                {q.level === 3 ? (
+                                                    q.pattern === 'parens_right' ? (
+                                                        <span>{q.num1} {q.op1} ({q.num2} {q.op2} {q.num3}) = ?</span>
+                                                    ) : q.pattern === 'parens_left' ? (
+                                                        <span>({q.num1} {q.op1} {q.num2}) {q.op2} {q.num3} = ?</span>
+                                                    ) : (
+                                                        <span>{q.num1} {q.op1} {q.num2} {q.op2} {q.num3} = ?</span>
+                                                    )
+                                                ) : q.level === 2 ? (
+                                                    <span>{q.num1} {q.op1} {q.num2} {q.op2} {q.num3} = ?</span>
+                                                ) : (
+                                                    <span>{q.num1} {q.op} {q.num2} = ?</span>
+                                                )}
+                                                <span className="text-red-400 text-sm">({q.answer})</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex justify-center">
+                                <button onClick={() => { setAppState('home'); setCurrentQuestion(null); setStats({ solved: 0, total: 0, mistakes: 0 }); }} className="bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 px-12 rounded-full shadow-lg transition-transform active:scale-95 flex items-center gap-2 text-xl">
+                                    <Home />
+                                    ホームにもどる
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!currentQuestion) return <div className="min-h-screen bg-pink-50" />;
+
+            return (
+                <div ref={containerRef} className="min-h-screen bg-pink-50 flex flex-col md:flex-row font-sans select-none overflow-hidden outline-none" tabIndex={0}>
+                    <div className={`flex-1 p-4 flex flex-col items-center justify-center relative transition-all duration-300 ${showKeypad ? 'h-[60vh] md:h-auto' : 'h-screen'}`}>
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-center bg-white/80 p-2 px-4 rounded-full backdrop-blur-sm z-10 border-2 border-pink-100 shadow-sm">
+                            <div className="flex items-center gap-2 text-pink-600 font-bold text-lg md:text-xl min-w-[100px]">
+                                <Trophy className="text-yellow-500 w-5 h-5 md:w-6 md:h-6" />
+                                <span>{stats.solved} / {gameMode === 'review' ? '?' : stats.total}</span>
+                            </div>
+                            <div className="flex gap-4">
+                                <button onClick={() => { setAppState('home'); setCurrentQuestion(null); }} className="p-2 text-gray-400 hover:text-pink-500 transition-colors" title="やめる"><Home size={24} /></button>
+                                <button onClick={() => setShowKeypad(!showKeypad)} className={`p-2 rounded-full transition-colors ${showKeypad ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-400'}`} title="キーパッド切替"><KeyboardIcon size={24} /></button>
+                            </div>
+                            <div className="flex items-center gap-2 justify-end min-w-[80px]">
+                                <Star fill={true} className="text-yellow-400 w-6 h-6 md:w-7 md:h-7" />
+                                <span className="text-2xl md:text-3xl font-black text-yellow-500 font-mono">{totalStars}</span>
+                            </div>
+                        </div>
+
+                        <div className={`w-full max-w-4xl bg-white rounded-[2rem] shadow-xl flex flex-col items-center justify-center p-4 md:p-12 transition-all duration-200 relative ${status === 'correct' ? 'border-4 border-green-400 bg-green-50' : 'border-4 border-white'} ${shake ? 'animate-bounce-custom border-4 border-red-400' : ''}`}>
+                            <div className="flex flex-wrap items-center justify-center gap-1 md:gap-4 mt-8 md:mt-0">
+                                {currentQuestion.level === 3 ? (
+                                    /* レベル3 (3項・優先順位/カッコ) */
+                                    currentQuestion.pattern === 'parens_right' ? (
+                                        <>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num1}</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op1)} mx-1`}>{currentQuestion.op1}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-400">(</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num2}</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op2)} mx-1`}>{currentQuestion.op2}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num3}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-400">)</span>
+                                        </>
+                                    ) : currentQuestion.pattern === 'parens_left' ? (
+                                        <>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-400">(</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num1}</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op1)} mx-1`}>{currentQuestion.op1}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num2}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-400">)</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op2)} mx-1`}>{currentQuestion.op2}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num3}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num1}</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op1)} mx-1`}>{currentQuestion.op1}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num2}</span>
+                                            <span className={`text-4xl md:text-6xl font-black ${getOpColor(currentQuestion.op2)} mx-1`}>{currentQuestion.op2}</span>
+                                            <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num3}</span>
+                                        </>
+                                    )
+                                ) : currentQuestion.level === 2 ? (
+                                    /* レベル2 (3項・左から) */
+                                    <>
+                                        <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num1}</span>
+                                        <span className={`text-5xl md:text-7xl font-black ${getOpColor(currentQuestion.op1)} mx-1`}>{currentQuestion.op1}</span>
+                                        <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num2}</span>
+                                        <span className={`text-5xl md:text-7xl font-black ${getOpColor(currentQuestion.op2)} mx-1`}>{currentQuestion.op2}</span>
+                                        <span className="text-4xl md:text-6xl font-black text-gray-700">{currentQuestion.num3}</span>
+                                    </>
+                                ) : (
+                                    /* レベル1 (2項) */
+                                    <>
+                                        <span className="text-5xl md:text-7xl font-black text-gray-700">{currentQuestion.num1}</span>
+                                        <span className={`text-6xl md:text-8xl font-black ${getOpColor(currentQuestion.op)} mx-2`}>{currentQuestion.op}</span>
+                                        <span className="text-5xl md:text-7xl font-black text-gray-700">{currentQuestion.num2}</span>
+                                    </>
+                                )}
+                                <span className="text-5xl md:text-7xl font-black text-gray-400">=</span>
+                                <div className={`min-w-[120px] md:min-w-[180px] h-[80px] md:h-[120px] bg-gray-50 rounded-2xl border-4 flex items-center justify-center text-5xl md:text-7xl font-black transition-all ${status === 'correct' ? 'text-green-500 border-green-200' : status === 'wrong' ? 'text-red-500 border-red-200' : 'text-gray-900 border-gray-200'}`}>
+                                    {userInput}
+                                    {!userInput && <span className="w-1 h-12 md:h-16 bg-gray-300 animate-pulse rounded-full" />}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {showKeypad && (
+                        <div className="w-full md:w-[350px] bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl md:border-l-4 border-pink-200 p-4 z-20 transition-all duration-300">
+                            <div className="h-full flex flex-col justify-center max-w-md mx-auto md:max-w-none">
+                                <div className="grid grid-cols-3 gap-3 md:gap-4 h-[35vh] md:h-auto">
+                                    {[7, 8, 9, 4, 5, 6, 1, 2, 3].map((num) => (
+                                        <button key={num} onClick={() => handleInput(num.toString())} className="active-scale flex items-center justify-center text-3xl font-bold rounded-xl transition-all shadow-sm bg-pink-100 text-pink-600 hover:bg-pink-200 border-b-4 border-pink-300">{num}</button>
+                                    ))}
+                                    <button onClick={() => handleInput('0')} className="col-span-2 active-scale flex items-center justify-center text-3xl font-bold rounded-xl transition-all shadow-sm bg-pink-100 text-pink-600 hover:bg-pink-200 border-b-4 border-pink-300">0</button>
+                                    <button onClick={() => handleInput('DEL')} className="active-scale bg-gray-100 text-gray-500 rounded-xl text-xl flex items-center justify-center border-b-4 border-gray-300 shadow-sm hover:bg-gray-200"><Delete size={28} /></button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
